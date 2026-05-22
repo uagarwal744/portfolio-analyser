@@ -3,6 +3,7 @@
 import logging
 from typing import Any
 
+from portfolio_analyzer.data.gold_data import get_gold_price_history
 from portfolio_analyzer.data.market_data import get_close_prices, get_nifty50_history
 from portfolio_analyzer.models.intent import IntentClassification
 from portfolio_analyzer.state import PortfolioState
@@ -70,11 +71,16 @@ def fetch_data_node(state: PortfolioState) -> dict[str, Any]:
     if not nifty.empty and "Close" in nifty.columns:
         nifty_close = nifty["Close"]
 
+    # Fetch Gold benchmark data (from bundled CSV)
+    gold_series = get_gold_price_history()
+    gold_json = gold_series.to_json() if not gold_series.empty else None
+
     # Serialize to dict for state storage
     market_data = {
         "close_prices": close_prices.to_json(),
         "columns": list(close_prices.columns),
         "nifty50": nifty_close.to_json() if nifty_close is not None else None,
+        "gold": gold_json,
         "days_fetched": days,
         "date_range": {
             "start": str(close_prices.index[0].date()),

@@ -36,9 +36,9 @@ def render_sidebar(session_id: str):
 
         with tab2:
             st.markdown("Paste comma-separated text:")
-            default_text = "ticker,quantity,buy_price\nRELIANCE,50,2450\nTCS,30,3800\nHDFCBANK,100,1650"
+            default_text = "ticker,quantity,buy_price\nBPCL,500,280\nLT,30,3500\nHDFCBANK,100,750"
             text_input = st.text_area("CSV Content", value=default_text, height=150)
-            if st.button("Analyze Text", use_container_width=True, type="primary"):
+            if st.button("Analyze Portfolio", use_container_width=True, type="primary"):
                 _handle_text_upload(session_id, text_input)
 
 
@@ -84,6 +84,11 @@ def _process_upload_response(response: httpx.Response):
             if "messages" not in st.session_state:
                 st.session_state["messages"] = []
             st.session_state["messages"].append({"role": "assistant", "content": data["message"]})
+            # Store suggested prompts for the chat component
+            if data.get("suggested_questions"):
+                st.session_state["suggestions"] = data["suggested_questions"]
+            # Clear any stale dashboard data from a previous session
+            st.session_state["dashboard_signals"] = []
             st.rerun()
         else:
             st.error(data.get("error", "Failed to load portfolio"))

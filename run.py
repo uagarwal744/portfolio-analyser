@@ -19,7 +19,7 @@ def main():
     # 1. Start FastAPI backend
     print("📦 Starting FastAPI backend on port 8000...")
     api_process = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "api.main:app", "--port", "8000"],
+        [sys.executable, "-m", "uvicorn", "api.main:app", "--port", "8000", "--reload"],
         env=env
     )
     

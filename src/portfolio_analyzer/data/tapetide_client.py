@@ -1,23 +1,24 @@
 """Tapetide MCP client for Indian stock market data.
 
-Uses the Tapetide MCP server (https://mcp.tapetide.com/mcp) via JSON-RPC
-over HTTP with Bearer token authentication.
+Uses the Tapetide MCP server (https://mcp.tapetide.com/mcp) via the official
+MCP python SDK (HTTP stateless transport) with Bearer token authentication.
 """
 
+import json
 import logging
 import os
+from contextlib import AsyncExitStack
 from typing import Any, Optional
 
 import httpx
 from dotenv import load_dotenv
+from mcp import ClientSession
+from mcp.client.streamable_http import streamable_http_client
+from mcp.types import TextContent
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
-
-# MCP JSON-RPC constants
-JSONRPC_VERSION = "2.0"
-MCP_CALL_TOOL_METHOD = "tools/call"
 
 
 class TapetideError(Exception):
@@ -26,11 +27,7 @@ class TapetideError(Exception):
 
 
 class TapetideClient:
-    """HTTP-based MCP client for the Tapetide stock data server.
-
-    Communicates via JSON-RPC 2.0 over HTTP POST requests.
-    All tool calls go through the standard MCP `tools/call` method.
-    """
+    """HTTP-based MCP client for the Tapetide stock data server."""
 
     def __init__(
         self,
@@ -43,86 +40,74 @@ class TapetideClient:
         )
         self.api_token = api_token or os.getenv("TAPETIDE_API_TOKEN", "")
         self.timeout = timeout
-        self._request_id = 0
-
-    def _next_id(self) -> int:
-        self._request_id += 1
-        return self._request_id
-
-    def _headers(self) -> dict[str, str]:
-        headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        }
-        if self.api_token:
-            headers["Authorization"] = f"Bearer {self.api_token}"
-        return headers
-
-    def _build_request(self, tool_name: str, arguments: dict[str, Any]) -> dict:
-        """Build a JSON-RPC 2.0 request for MCP tools/call."""
-        return {
-            "jsonrpc": JSONRPC_VERSION,
-            "id": self._next_id(),
-            "method": MCP_CALL_TOOL_METHOD,
-            "params": {
-                "name": tool_name,
-                "arguments": arguments,
-            },
-        }
 
     async def call_tool(self, tool_name: str, arguments: dict[str, Any]) -> Any:
         """Call a Tapetide MCP tool and return the result.
 
+        Connects via HTTP stateless transport, initializes the session, and calls the tool.
+        
         Args:
             tool_name: Name of the MCP tool (e.g., 'search_stocks').
             arguments: Tool-specific arguments.
 
         Returns:
-            The tool result content.
+            The parsed tool result content.
 
         Raises:
             TapetideError: If the server returns an error.
         """
-        payload = self._build_request(tool_name, arguments)
         logger.debug(f"Tapetide MCP call: {tool_name}({arguments})")
+        
+        headers = {}
+        if self.api_token:
+            headers["Authorization"] = f"Bearer {self.api_token}"
 
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.post(
-                self.base_url,
-                json=payload,
-                headers=self._headers(),
-            )
-            response.raise_for_status()
-            data = response.json()
-
-        if "error" in data:
-            error = data["error"]
-            msg = error.get("message", str(error))
-            logger.error(f"Tapetide error for {tool_name}: {msg}")
-            raise TapetideError(f"{tool_name}: {msg}")
-
-        result = data.get("result", {})
-        # MCP tool results come in a 'content' array
-        content = result.get("content", [])
-        if content and isinstance(content, list):
-            # Return the text content of the first content block
-            first = content[0]
-            if isinstance(first, dict) and first.get("type") == "text":
-                import json
-                try:
-                    return json.loads(first["text"])
-                except (json.JSONDecodeError, TypeError):
-                    return first["text"]
-            return first
-        return result
+        try:
+            async with AsyncExitStack() as stack:
+                http_client = httpx.AsyncClient(headers=headers, timeout=self.timeout)
+                # Ensure the client is closed properly if not handled by the context
+                stack.push_async_callback(http_client.aclose)
+                
+                stream_transport = await stack.enter_async_context(
+                    streamable_http_client(self.base_url, http_client=http_client)
+                )
+                
+                # streamable_http_client returns (read_transport, write_transport)
+                read_t, write_t = stream_transport[0], stream_transport[1]
+                
+                session = await stack.enter_async_context(
+                    ClientSession(read_t, write_t)
+                )
+                await session.initialize()
+                
+                result = await session.call_tool(tool_name, arguments=arguments)
+                
+                if result.isError:
+                    error_msgs = [c.text for c in result.content if isinstance(c, TextContent)]
+                    err = " | ".join(error_msgs) if error_msgs else "Unknown tool error"
+                    raise TapetideError(f"{tool_name}: {err}")
+                
+                if result.content:
+                    first = result.content[0]
+                    if isinstance(first, TextContent):
+                        try:
+                            return json.loads(first.text)
+                        except (json.JSONDecodeError, TypeError):
+                            return first.text
+                    return first
+                
+                return {}
+                
+        except Exception as e:
+            logger.error(f"Tapetide error for {tool_name}: {e}")
+            if isinstance(e, TapetideError):
+                raise
+            raise TapetideError(f"{tool_name} connection failed: {e}")
 
     # ── Convenience methods ──
 
     async def search_stock(self, query: str) -> list[dict]:
-        """Search for a stock by name, symbol, or ISIN.
-
-        Returns a list of matching stocks with symbol, name, exchange info.
-        """
+        """Search for a stock by name, symbol, or ISIN."""
         result = await self.call_tool("search_stocks", {"query": query})
         if isinstance(result, list):
             return result
@@ -133,12 +118,7 @@ class TapetideClient:
     async def get_company_profile(
         self, symbol: str, include_technicals: bool = False
     ) -> dict:
-        """Get comprehensive company profile including sector, fundamentals.
-
-        Args:
-            symbol: NSE symbol (e.g., 'RELIANCE').
-            include_technicals: Whether to include technical indicators.
-        """
+        """Get comprehensive company profile including sector, fundamentals."""
         args: dict[str, Any] = {"symbol": symbol}
         if include_technicals:
             args["include_technicals"] = True
@@ -160,25 +140,14 @@ class TapetideClient:
     async def get_price_history(
         self, symbol: str, days: int = 365, interval: str = "daily"
     ) -> dict:
-        """Get historical OHLCV data.
-
-        Args:
-            symbol: NSE symbol.
-            days: Number of trading days of history (max 2000).
-            interval: 'daily' or 'weekly'.
-        """
+        """Get historical OHLCV data."""
         return await self.call_tool(
             "get_price_history",
             {"symbol": symbol, "days": min(days, 2000), "interval": interval},
         )
 
     async def get_financials(self, symbol: str, period: str = "annual") -> dict:
-        """Get P&L, balance sheet, cash flow, ratios.
-
-        Args:
-            symbol: NSE symbol.
-            period: 'quarterly' or 'annual'.
-        """
+        """Get P&L, balance sheet, cash flow, ratios."""
         return await self.call_tool(
             "get_financials", {"symbol": symbol, "period": period}
         )

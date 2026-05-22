@@ -21,7 +21,7 @@ METRIC_RUNNERS = {
         "historical_returns": returns.calc_historical_returns(prices, weights),
         "cagr": returns.calc_cagr(prices, weights),
         "period_returns": returns.calc_period_returns(prices, weights),
-        "rolling_returns": returns.calc_rolling_returns(prices, weights),
+        "rolling_returns": returns.calc_rolling_returns(prices, weights, bench=bench),
     },
     "risk": lambda prices, weights, bench: {
         "volatility": risk.calc_volatility(prices, weights),
@@ -44,13 +44,8 @@ METRIC_RUNNERS = {
         "correlation_matrix": correlation.calc_correlation_matrix(prices),
         "portfolio_concentration": correlation.calc_portfolio_concentration(weights),
     },
-    "benchmark": lambda prices, weights, bench: {
-        **({"benchmark_comparison": benchmark.calc_benchmark_comparison(prices, bench, weights)} if bench is not None else {}),
-        **({"alpha": benchmark.calc_alpha(prices, bench, weights)} if bench is not None else {}),
-        **({"tracking_error": benchmark.calc_tracking_error(prices, bench, weights)} if bench is not None else {}),
-        **({"excess_returns": benchmark.calc_excess_returns(prices, bench, weights)} if bench is not None else {}),
-    },
-    "sector": lambda prices, weights, bench: {},  # Handled separately (needs holding data, not prices)
+    "benchmark": None,  # Handled separately (needs multiple benchmarks)
+    "sector": None,  # Handled separately (needs holding data, not prices)
 }
 
 
@@ -71,12 +66,14 @@ def execute_analysis_node(state: PortfolioState) -> dict[str, Any]:
 
     logger.info(f"Running metrics: {required_metrics}")
 
+    import io
+    
     # Deserialize price data
     close_prices_json = market_data.get("close_prices")
     if not close_prices_json:
         return {"analysis_results": {"error": "No price data available"}}
 
-    close_prices = pd.read_json(close_prices_json)
+    close_prices = pd.read_json(io.StringIO(close_prices_json))
     close_prices.index = pd.to_datetime(close_prices.index)
     close_prices = close_prices.sort_index()
 
@@ -84,12 +81,27 @@ def execute_analysis_node(state: PortfolioState) -> dict[str, Any]:
     nifty_json = market_data.get("nifty50")
     bench_series = None
     if nifty_json:
-        bench_series = pd.read_json(nifty_json, typ="series")
+        bench_series = pd.read_json(io.StringIO(nifty_json), typ="series")
         bench_series.index = pd.to_datetime(bench_series.index)
         bench_series = bench_series.sort_index()
 
-    # Portfolio weights
-    weights = portfolio.weights
+    # Deserialize gold benchmark data
+    gold_json = market_data.get("gold")
+    gold_series = None
+    if gold_json:
+        gold_series = pd.read_json(io.StringIO(gold_json), typ="series")
+        gold_series.index = pd.to_datetime(gold_series.index)
+        gold_series = gold_series.sort_index()
+
+    # Portfolio weights mapped to Yahoo Finance tickers (which match price columns)
+    weights = {h.ticker_ns: portfolio.weights.get(h.ticker, 0.0) for h in portfolio.holdings}
+
+    # Build a dict of all available benchmarks
+    benchmarks = {}
+    if bench_series is not None:
+        benchmarks["Nifty 50"] = bench_series
+    if gold_series is not None:
+        benchmarks["Gold"] = gold_series
 
     # Run each required metric module
     all_results: dict[str, Any] = {}
@@ -119,7 +131,29 @@ def execute_analysis_node(state: PortfolioState) -> dict[str, Any]:
                 "sector_concentration": sector_conc,
                 "hidden_concentration": hidden,
             }
-        elif metric_name in METRIC_RUNNERS:
+        elif metric_name == "benchmark":
+            # Run benchmark comparison against all available benchmarks
+            bench_results = {}
+            for bench_name, bench_data in benchmarks.items():
+                try:
+                    comp = benchmark.calc_benchmark_comparison(close_prices, bench_data, weights)
+                    comp["benchmark_name"] = bench_name
+                    bench_results[bench_name] = comp
+                except Exception as e:
+                    logger.error(f"Benchmark {bench_name} failed: {e}")
+                    bench_results[bench_name] = {"error": str(e)}
+
+            # Also run alpha/tracking error against primary benchmark (Nifty 50)
+            if bench_series is not None:
+                try:
+                    bench_results["alpha"] = benchmark.calc_alpha(close_prices, bench_series, weights)
+                    bench_results["tracking_error"] = benchmark.calc_tracking_error(close_prices, bench_series, weights)
+                    bench_results["excess_returns"] = benchmark.calc_excess_returns(close_prices, bench_series, weights)
+                except Exception as e:
+                    logger.error(f"Alpha/tracking calculation failed: {e}")
+
+            all_results["benchmark"] = bench_results
+        elif metric_name in METRIC_RUNNERS and METRIC_RUNNERS[metric_name] is not None:
             try:
                 results = METRIC_RUNNERS[metric_name](close_prices, weights, bench_series)
                 all_results[metric_name] = results
@@ -129,5 +163,18 @@ def execute_analysis_node(state: PortfolioState) -> dict[str, Any]:
         else:
             logger.warning(f"Unknown metric module: {metric_name}")
 
+    import numpy as np
+
+    def _convert_np_types(obj: Any) -> Any:
+        if isinstance(obj, dict):
+            return {k: _convert_np_types(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [_convert_np_types(v) for v in obj]
+        elif isinstance(obj, tuple):
+            return tuple(_convert_np_types(v) for v in obj)
+        elif isinstance(obj, np.generic):
+            return obj.item()
+        return obj
+
     logger.info(f"Analysis complete: {list(all_results.keys())}")
-    return {"analysis_results": all_results}
+    return {"analysis_results": _convert_np_types(all_results)}

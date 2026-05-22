@@ -1,7 +1,8 @@
 """LangGraph StateGraph definition and compilation.
 
-This is the main entry point for the portfolio analyzer agent.
-It defines the graph topology, routing logic, and compiles the graph.
+The graph handles the analysis pipeline only. Portfolio parsing is done
+outside the graph (in the API layer). The graph always starts from
+classify_intent with a pre-loaded portfolio.
 """
 
 import logging
@@ -16,7 +17,6 @@ from portfolio_analyzer.nodes.emit_dashboard import emit_dashboard_node
 from portfolio_analyzer.nodes.execute_analysis import execute_analysis_node
 from portfolio_analyzer.nodes.fetch_data import fetch_data_node
 from portfolio_analyzer.nodes.generate_response import generate_response_node
-from portfolio_analyzer.nodes.parse_portfolio import parse_portfolio_node
 from portfolio_analyzer.nodes.suggest_followups import suggest_followups_node
 from portfolio_analyzer.state import PortfolioState
 
@@ -24,26 +24,6 @@ logger = logging.getLogger(__name__)
 
 
 # ── Routing functions ──
-
-
-def route_entry(state: PortfolioState) -> str:
-    """Route at graph entry: parse CSV if new, else classify intent.
-
-    Also handles the case where portfolio was just parsed (has error or not).
-    """
-    if state.get("has_csv", False):
-        return "parse_portfolio"
-    if state.get("portfolio") is None:
-        return "parse_portfolio"
-    return "classify_intent"
-
-
-def route_after_parse(state: PortfolioState) -> str:
-    """Route after portfolio parsing: check for errors."""
-    if state.get("error"):
-        # Error occurred (e.g., non-Indian stock) — end the turn
-        return END
-    return "classify_intent"
 
 
 def route_by_intent(state: PortfolioState) -> str:
@@ -76,7 +56,6 @@ def build_portfolio_graph(checkpointer=None):
     graph = StateGraph(PortfolioState)
 
     # ── Register nodes ──
-    graph.add_node("parse_portfolio", parse_portfolio_node)
     graph.add_node("classify_intent", classify_intent_node)
     graph.add_node("fetch_data", fetch_data_node)
     graph.add_node("execute_analysis", execute_analysis_node)
@@ -86,25 +65,8 @@ def build_portfolio_graph(checkpointer=None):
 
     # ── Define edges ──
 
-    # Entry point: route based on whether CSV is present
-    graph.add_conditional_edges(
-        START,
-        route_entry,
-        {
-            "parse_portfolio": "parse_portfolio",
-            "classify_intent": "classify_intent",
-        },
-    )
-
-    # After parsing: check for errors
-    graph.add_conditional_edges(
-        "parse_portfolio",
-        route_after_parse,
-        {
-            END: END,
-            "classify_intent": "classify_intent",
-        },
-    )
+    # Entry: always classify intent first
+    graph.add_edge(START, "classify_intent")
 
     # After intent classification: route to analysis or direct response
     graph.add_conditional_edges(

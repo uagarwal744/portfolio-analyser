@@ -29,14 +29,24 @@ def render_chat(session_id: str):
         suggestions = st.session_state.get("suggestions", PREDEFINED_PROMPTS[:4])
         if suggestions:
             st.markdown("---")
-            st.markdown("<small>Suggestions:</small>", unsafe_allow_html=True)
+            st.markdown("<small>💡 **Suggested analyses:**</small>", unsafe_allow_html=True)
             
-            # Layout suggestions in columns
-            cols = st.columns(min(len(suggestions), 4))
-            for i, suggestion in enumerate(suggestions[:4]):
-                with cols[i]:
-                    if st.button(suggestion, key=f"sugg_{i}"):
+            # First row: up to 3 suggestions
+            row1 = suggestions[:3]
+            cols1 = st.columns(len(row1))
+            for i, suggestion in enumerate(row1):
+                with cols1[i]:
+                    if st.button(suggestion, key=f"sugg_{i}", use_container_width=True):
                         _handle_chat(session_id, suggestion)
+            
+            # Second row: remaining suggestions
+            row2 = suggestions[3:5]
+            if row2:
+                cols2 = st.columns(len(row2))
+                for i, suggestion in enumerate(row2):
+                    with cols2[i]:
+                        if st.button(suggestion, key=f"sugg_{i+3}", use_container_width=True):
+                            _handle_chat(session_id, suggestion)
 
     # Chat input
     if prompt := st.chat_input("Ask about your portfolio..."):

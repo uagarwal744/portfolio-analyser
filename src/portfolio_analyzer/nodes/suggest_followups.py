@@ -88,7 +88,11 @@ def suggest_followups_node(state: PortfolioState) -> dict[str, Any]:
         ])
 
         # Parse JSON array from response
-        content = response.content.strip()
+        content = response.content
+        if isinstance(content, list):
+            # Handle list of text blocks from Gemini/LangChain
+            content = "".join([c.get("text", "") if isinstance(c, dict) else str(c) for c in content])
+        content = content.strip()
         # Handle markdown code blocks
         if "```" in content:
             content = content.split("```")[1]

@@ -84,6 +84,7 @@ class PortfolioUploadResponse(BaseModel):
     success: bool
     message: str
     portfolio: Optional[PortfolioResponse] = None
+    suggested_questions: list[str] = Field(default_factory=list)
     error: Optional[str] = None
 
 

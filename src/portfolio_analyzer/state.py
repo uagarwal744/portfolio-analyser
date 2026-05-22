@@ -93,4 +93,3 @@ class PortfolioState(TypedDict):
 
     # ── Control flow ──
     error: Optional[str]  # Error message (e.g., non-Indian stock)
-    has_csv: bool  # Whether this turn includes a new CSV

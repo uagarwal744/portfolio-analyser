@@ -139,20 +139,26 @@ async def parse_portfolio_node(state: PortfolioState) -> dict[str, Any]:
     # Calculate total invested
     portfolio.total_invested = sum(h.investment_value for h in portfolio.holdings)
 
-    # Build summary message
-    summary_lines = [f"✅ Portfolio loaded: {len(portfolio.holdings)} stocks, ₹{portfolio.total_invested:,.0f} invested\n"]
+    # Build summary message (conversational, no immediate analysis)
+    summary_lines = [f"✅ **Portfolio loaded**: {len(portfolio.holdings)} stocks, ₹{portfolio.total_invested:,.0f} invested\n"]
     for h in portfolio.holdings:
         current = f"₹{h.current_price:,.2f}" if h.current_price else "N/A"
         sector = h.sector or "—"
-        summary_lines.append(f"  • {h.ticker} — {h.quantity} shares @ ₹{h.buy_price:,.2f} | Current: {current} | Sector: {sector}")
+        summary_lines.append(f"  • **{h.ticker}** — {h.quantity} shares @ ₹{h.buy_price:,.2f} | Current: {current} | Sector: {sector}")
 
-    summary_lines.append("\nWhat would you like to analyze? For example:")
-    summary_lines.append("  • \"What's my overall risk profile?\"")
-    summary_lines.append("  • \"Show me sector exposure\"")
-    summary_lines.append("  • \"How does my portfolio compare to Nifty 50?\"")
+    summary_lines.append("\nWhat would you like to know about your portfolio? Pick one of the suggestions below, or ask me anything!")
+
+    suggested = [
+        "What's my overall risk profile?",
+        "Show me sector exposure and concentration",
+        "How does my portfolio compare to Nifty 50?",
+        "Run a tail risk analysis (VaR & drawdown)",
+        "Check correlation between my holdings",
+    ]
 
     return {
         "portfolio": portfolio,
         "error": None,
         "messages": [AIMessage(content="\n".join(summary_lines))],
+        "suggested_questions": suggested,
     }

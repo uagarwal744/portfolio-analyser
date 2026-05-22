@@ -173,6 +173,7 @@ def _emit_returns_signals(results: dict) -> list[DashboardSignal]:
     signals = []
     period = results.get("period_returns", {})
     cagr = results.get("cagr", {})
+    rolling = results.get("rolling_returns", {})
 
     if period or cagr:
         data = {}
@@ -188,6 +189,15 @@ def _emit_returns_signals(results: dict) -> list[DashboardSignal]:
             data=data,
             priority=3,
         ))
+        
+    if rolling and "dates" in rolling and "portfolio_rolling" in rolling:
+        signals.append(DashboardSignal(
+            signal_type=DashboardSignalType.ROLLING_RETURNS_CHART,
+            title=f"Rolling {rolling.get('window_days', 30)}-Day Return vs {rolling.get('benchmark_name', 'Benchmark')}",
+            data=rolling,
+            priority=4,
+        ))
+
     return signals
 
 

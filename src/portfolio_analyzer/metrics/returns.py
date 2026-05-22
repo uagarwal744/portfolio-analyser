@@ -93,6 +93,7 @@ def calc_cagr(
 def calc_rolling_returns(
     prices: pd.DataFrame,
     weights: dict[str, float],
+    bench: pd.Series | None = None,
     window: int = 30,
 ) -> dict:
     """Calculate rolling returns over a specified window.
@@ -100,10 +101,11 @@ def calc_rolling_returns(
     Args:
         prices: DataFrame of closing prices.
         weights: Dict of ticker → portfolio weight.
+        bench: Optional Series of benchmark closing prices.
         window: Rolling window in trading days (default 30 ≈ 1 month).
 
     Returns:
-        Dict with rolling return statistics.
+        Dict with rolling return statistics and timeseries for plotting.
     """
     if prices.empty or len(prices) < window:
         return {"error": f"Need at least {window} days of data for rolling returns"}
@@ -114,23 +116,45 @@ def calc_rolling_returns(
         weight_arr = weight_arr / weight_arr.sum()
     portfolio_daily = pd.Series(returns.values @ weight_arr, index=returns.index)
 
-    rolling = portfolio_daily.rolling(window=window).apply(
+    rolling_port = portfolio_daily.rolling(window=window).apply(
         lambda x: np.prod(1 + x) - 1, raw=True
-    )
-    rolling = rolling.dropna()
+    ).dropna()
 
-    if rolling.empty:
+    if rolling_port.empty:
         return {"error": "Insufficient data for rolling calculation"}
 
-    return {
+    result = {
         "window_days": window,
-        "current_rolling_return": float(rolling.iloc[-1]),
-        "avg_rolling_return": float(rolling.mean()),
-        "best_rolling_return": float(rolling.max()),
-        "worst_rolling_return": float(rolling.min()),
-        "best_period_end": str(rolling.idxmax().date()),
-        "worst_period_end": str(rolling.idxmin().date()),
+        "current_rolling_return": float(rolling_port.iloc[-1]),
+        "avg_rolling_return": float(rolling_port.mean()),
+        "best_rolling_return": float(rolling_port.max()),
+        "worst_rolling_return": float(rolling_port.min()),
+        "best_period_end": str(rolling_port.idxmax().date()),
+        "worst_period_end": str(rolling_port.idxmin().date()),
     }
+
+    # Add timeseries data for plotting (sample to avoid huge payloads)
+    step = max(1, len(rolling_port) // 250)
+    sampled_port = rolling_port.iloc[::step]
+    
+    result["dates"] = [str(d.date()) for d in sampled_port.index]
+    result["portfolio_rolling"] = [float(v) for v in sampled_port.values]
+
+    if bench is not None and not bench.empty:
+        bench_ret = bench.pct_change().dropna()
+        common = returns.index.intersection(bench_ret.index)
+        if len(common) >= window:
+            bench_ret_common = bench_ret.loc[common]
+            rolling_bench = bench_ret_common.rolling(window=window).apply(
+                lambda x: np.prod(1 + x) - 1, raw=True
+            ).dropna()
+            
+            # Sample using the same dates as portfolio where possible
+            rolling_bench_sampled = rolling_bench.reindex(sampled_port.index, method='ffill')
+            result["benchmark_rolling"] = [float(v) if pd.notna(v) else None for v in rolling_bench_sampled.values]
+            result["benchmark_name"] = "Nifty 50"
+
+    return result
 
 
 def calc_period_returns(

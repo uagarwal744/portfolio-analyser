@@ -53,6 +53,8 @@ def _render_signal(signal: dict):
         _render_correlation_heatmap(data)
     elif sig_type == "returns_chart":
         _render_returns_chart(data)
+    elif sig_type == "rolling_returns_chart":
+        _render_rolling_returns_chart(data)
     elif sig_type == "benchmark_comparison":
         _render_benchmark_comparison(data)
     elif sig_type == "var_summary":
@@ -64,6 +66,36 @@ def _render_signal(signal: dict):
 
     if desc and not alert_level:
         st.caption(desc)
+
+
+def _render_rolling_returns_chart(data: dict):
+    """Render a rolling returns timeseries vs benchmark."""
+    dates = data.get("dates", [])
+    port_rolling = data.get("portfolio_rolling", [])
+    bench_rolling = data.get("benchmark_rolling", [])
+    
+    if not dates or not port_rolling:
+        return
+
+    # Convert to %
+    port_rolling = [v * 100 for v in port_rolling]
+    
+    df_data = {"Date": pd.to_datetime(dates), "Portfolio": port_rolling}
+    
+    if bench_rolling:
+        bench_rolling = [v * 100 if v is not None else None for v in bench_rolling]
+        df_data["Benchmark"] = bench_rolling
+        
+    df = pd.DataFrame(df_data)
+    
+    fig = px.line(df, x="Date", y=df.columns[1:])
+    fig.update_layout(
+        height=300,
+        margin=dict(l=10, r=10, t=10, b=10),
+        yaxis=dict(title="Rolling Return (%)"),
+        legend_title_text=""
+    )
+    st.plotly_chart(fig, use_container_width=True)
 
 
 def _render_risk_gauge(data: dict):
@@ -170,8 +202,12 @@ def _render_returns_chart(data: dict):
         st.metric("CAGR (Annualized Return)", f"{cagr*100:.2f}%")
 
     if period_returns:
-        periods = list(period_returns.keys())
-        returns = [v * 100 for v in period_returns.values()]  # Convert to %
+        periods = []
+        returns = []
+        for p, v in period_returns.items():
+            if v is not None:
+                periods.append(p)
+                returns.append(v * 100)  # Convert to %
         
         df = pd.DataFrame({"Period": periods, "Return (%)": returns})
         
