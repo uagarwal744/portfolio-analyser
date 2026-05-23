@@ -18,28 +18,44 @@ def render_sidebar(session_id: str):
             if st.button("Reset Session", use_container_width=True, type="secondary"):
                 st.session_state.clear()
                 st.rerun()
-            return
+            
+            st.markdown("---")
+            with st.expander("Update Portfolio"):
+                _render_upload_tabs(session_id)
+        else:
+            st.markdown("Upload your portfolio to get started.")
+            _render_upload_tabs(session_id)
 
-        st.markdown("Upload your portfolio to get started.")
 
-        # Tabbed interface for File vs Text Paste
-        tab1, tab2 = st.tabs(["Upload CSV", "Paste Text"])
+def _render_upload_tabs(session_id: str):
+    """Render the tabs for uploading a CSV file or pasting text."""
+    tab1, tab2 = st.tabs(["Upload CSV", "Paste Text"])
 
-        with tab1:
-            uploaded_file = st.file_uploader(
-                "Choose a CSV file",
-                type="csv",
-                help="Must contain columns: ticker, quantity, buy_price"
-            )
-            if uploaded_file is not None and st.button("Analyse Portfolio", use_container_width=True, type="primary"):
-                _handle_file_upload(session_id, uploaded_file)
+    with tab1:
+        uploaded_file = st.file_uploader(
+            "Choose a CSV file",
+            type="csv",
+            help="Must contain columns: ticker, quantity, buy_price",
+            key="file_uploader"
+        )
+        if uploaded_file is not None and st.button("Analyse Portfolio", use_container_width=True, type="primary"):
+            _handle_file_upload(session_id, uploaded_file)
 
-        with tab2:
-            st.markdown("Paste comma-separated text:")
+    with tab2:
+        st.markdown("Paste comma-separated text:")
+        
+        portfolio = st.session_state.get("portfolio")
+        if portfolio and portfolio.get("holdings"):
+            lines = ["ticker,quantity,buy_price"]
+            for h in portfolio["holdings"]:
+                lines.append(f"{h['ticker']},{h['quantity']},{h['buy_price']}")
+            default_text = "\n".join(lines)
+        else:
             default_text = "ticker,quantity,buy_price\nBPCL,500,280\nLT,30,3500\nHDFCBANK,100,750"
-            text_input = st.text_area("CSV Content", value=default_text, height=150)
-            if st.button("Analyze Portfolio", use_container_width=True, type="primary"):
-                _handle_text_upload(session_id, text_input)
+            
+        text_input = st.text_area("CSV Content", value=default_text, height=150)
+        if st.button("Analyze Portfolio", use_container_width=True, type="primary", key="text_btn"):
+            _handle_text_upload(session_id, text_input)
 
 
 def _handle_file_upload(session_id: str, file):
@@ -80,15 +96,26 @@ def _process_upload_response(response: httpx.Response):
         if data.get("success"):
             # Update session state with the new portfolio data
             st.session_state["portfolio"] = data["portfolio"]
-            # Add the initial summary message to chat
-            if "messages" not in st.session_state:
-                st.session_state["messages"] = []
-            st.session_state["messages"].append({"role": "assistant", "content": data["message"]})
+            
+            # Check if this is an update (we already have a conversation)
+            is_update = "messages" in st.session_state and len(st.session_state["messages"]) > 0
+            
+            if is_update:
+                update_msg = "I have updated my portfolio. Please recalculate my previous metrics."
+                st.session_state["messages"].append({"role": "user", "content": update_msg})
+                st.session_state["pending_chat"] = update_msg
+            else:
+                # Initial upload
+                if "messages" not in st.session_state:
+                    st.session_state["messages"] = []
+                st.session_state["messages"].append({"role": "assistant", "content": data["message"]})
+                # Clear any stale dashboard data from a previous session
+                st.session_state["dashboard_signals"] = []
+                
             # Store suggested prompts for the chat component
             if data.get("suggested_questions"):
                 st.session_state["suggestions"] = data["suggested_questions"]
-            # Clear any stale dashboard data from a previous session
-            st.session_state["dashboard_signals"] = []
+                
             st.rerun()
         else:
             st.error(data.get("error", "Failed to load portfolio"))

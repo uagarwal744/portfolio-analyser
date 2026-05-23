@@ -155,23 +155,30 @@ def execute_analysis_node(state: PortfolioState) -> dict[str, Any]:
                 "hidden_concentration": hidden,
             }
         elif metric_name == "benchmark":
-            # Run benchmark comparison against all available benchmarks
+            # Determine which benchmark to run based on intent
+            requested = (intent.benchmark_requested or "").lower()
+            
+            target_bench_name = "Nifty 50"
+            if "gold" in requested and "Gold" in benchmarks:
+                target_bench_name = "Gold"
+            elif "Nifty 50" not in benchmarks and benchmarks:
+                target_bench_name = list(benchmarks.keys())[0]
+
             bench_results = {}
-            for bench_name, bench_data in benchmarks.items():
+            if target_bench_name in benchmarks:
+                bench_data = benchmarks[target_bench_name]
                 try:
                     comp = benchmark.calc_benchmark_comparison(close_prices, bench_data, weights)
-                    comp["benchmark_name"] = bench_name
-                    bench_results[bench_name] = comp
+                    comp["benchmark_name"] = target_bench_name
+                    bench_results[target_bench_name] = comp
                 except Exception as e:
-                    logger.error(f"Benchmark {bench_name} failed: {e}")
-                    bench_results[bench_name] = {"error": str(e)}
+                    logger.error(f"Benchmark {target_bench_name} failed: {e}")
+                    bench_results[target_bench_name] = {"error": str(e)}
 
-            # Also run alpha/tracking error against primary benchmark (Nifty 50)
-            if bench_series is not None:
                 try:
-                    bench_results["alpha"] = benchmark.calc_alpha(close_prices, bench_series, weights)
-                    bench_results["tracking_error"] = benchmark.calc_tracking_error(close_prices, bench_series, weights)
-                    bench_results["excess_returns"] = benchmark.calc_excess_returns(close_prices, bench_series, weights)
+                    bench_results["alpha"] = benchmark.calc_alpha(close_prices, bench_data, weights)
+                    bench_results["tracking_error"] = benchmark.calc_tracking_error(close_prices, bench_data, weights)
+                    bench_results["excess_returns"] = benchmark.calc_excess_returns(close_prices, bench_data, weights)
                 except Exception as e:
                     logger.error(f"Alpha/tracking calculation failed: {e}")
 

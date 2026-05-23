@@ -6,6 +6,7 @@ This document outlines planned improvements across five key areas, focusing on m
 
 ## 1. UI/UX
 
+- [ ] **Latency Improvement** — Streaming response, caching, parallel processing of metrics. 
 - [ ] **Multi-tab dashboard** — Separate dashboard tabs for Risk, Returns, Sector, and a unified Overview tab.
 - [ ] **Export functionality** — Download analysis as PDF report or share via link.
 - [ ] **React/Next.js frontend** — Migrate to a custom React frontend for richer interactivity and state management.

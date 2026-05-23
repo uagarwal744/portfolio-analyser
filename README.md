@@ -17,6 +17,9 @@ A full-stack, AI-powered stock portfolio analyzer built for the Indian stock mar
 *   **Conversational Flow & Guardrails**: 
     *   Generates context-aware follow-up questions to drive deeper analysis.
     *   Gracefully handles out-of-domain queries and session termination requests.
+*   **State Management & Memory**:
+    *   **Portfolio Store**: The raw uploaded portfolio is parsed and enriched via FastAPI and held in an in-memory session store (keyed by `session_id`).
+    *   **Graph Checkpointing**: LangGraph's `MemorySaver` preserves the chat history, parsed intents, and executed analysis results across turns, allowing the agent to maintain deep conversational context without recomputing unchanged metrics.
 
 ## Tech Stack
 

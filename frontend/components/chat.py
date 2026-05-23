@@ -20,9 +20,20 @@ def render_chat(session_id: str):
     
     # Render chat history
     messages = st.session_state.get("messages", [])
-    for msg in messages:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
+    
+    if len(messages) > 2:
+        with st.expander("Previous Conversation", expanded=False):
+            for msg in messages[:-2]:
+                with st.chat_message(msg["role"]):
+                    st.markdown(msg["content"])
+        
+        for msg in messages[-2:]:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+    else:
+        for msg in messages:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
             
     # Quick actions/suggestions (only show if portfolio is loaded)
     if st.session_state.get("portfolio"):

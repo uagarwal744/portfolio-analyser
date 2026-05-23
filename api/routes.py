@@ -117,8 +117,14 @@ async def _enrich_holding(client: TapetideClient, holding: Holding) -> Holding:
         profile = await client.get_company_profile(holding.ticker)
         if isinstance(profile, dict):
             data = profile.get("data", profile)
-            holding.sector = data.get("sector", data.get("info", {}).get("sector"))
-            holding.industry = data.get("industry", data.get("info", {}).get("industry"))
+            
+            # Try to get sector/industry from company or fundamentals
+            company = data.get("company", {})
+            fundamentals = data.get("fundamentals", {})
+            
+            holding.sector = company.get("sector") or fundamentals.get("sector") or data.get("sector") or data.get("info", {}).get("sector")
+            holding.industry = company.get("industry") or fundamentals.get("industry") or data.get("industry") or data.get("info", {}).get("industry")
+            
             quote = data.get("quote", {})
             if quote and isinstance(quote, dict):
                 holding.current_price = quote.get("price") or quote.get("lastPrice")

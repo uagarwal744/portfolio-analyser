@@ -36,6 +36,20 @@ def classify_intent_node(state: PortfolioState) -> dict[str, Any]:
         }
 
     latest_msg = user_messages[-1].content
+    
+    # Check if this is an automatic mid-session portfolio update
+    if latest_msg == "I have updated my portfolio. Please recalculate my previous metrics.":
+        existing_intent = state.get("intent")
+        if existing_intent:
+            logger.info("Portfolio updated, reusing previous intent.")
+            return {"intent": existing_intent}
+        else:
+            # Fallback if no prior intent exists
+            return {
+                "intent": IntentClassification(
+                    primary_intent=AnalysisIntent.OVERVIEW
+                ).model_dump()
+            }
 
     # Build the classification prompt
     classification_prompt = INTENT_CLASSIFICATION_PROMPT.format(

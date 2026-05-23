@@ -224,9 +224,10 @@ def _render_benchmark_comparison(data: dict):
     """Render grouped bar chart for portfolio vs benchmark."""
     port_ret = data.get("portfolio_total_return", 0) * 100
     bench_ret = data.get("benchmark_total_return", 0) * 100
+    bench_name = data.get("benchmark_name", "Benchmark")
     
     df = pd.DataFrame({
-        "Entity": ["Portfolio", "Nifty 50"],
+        "Entity": ["Portfolio", bench_name],
         "Total Return (%)": [port_ret, bench_ret]
     })
     
@@ -235,7 +236,7 @@ def _render_benchmark_comparison(data: dict):
         x="Entity", 
         y="Total Return (%)", 
         color="Entity",
-        color_discrete_map={"Portfolio": "#1f77b4", "Nifty 50": "#ff7f0e"}
+        color_discrete_map={"Portfolio": "#1f77b4", bench_name: "#ff7f0e"}
     )
     fig.update_layout(height=250, margin=dict(l=10, r=10, t=10, b=10), showlegend=False)
     st.plotly_chart(fig, use_container_width=True)
