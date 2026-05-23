@@ -90,25 +90,25 @@ def calc_cagr(
     }
 
 
-def calc_rolling_returns(
+def calc_cumulative_returns(
     prices: pd.DataFrame,
     weights: dict[str, float],
     bench: pd.Series | None = None,
-    window: int = 30,
+    benchmark_name: str = "Nifty 50",
 ) -> dict:
-    """Calculate rolling returns over a specified window.
+    """Calculate cumulative returns from the first point in timeseries.
 
     Args:
         prices: DataFrame of closing prices.
         weights: Dict of ticker → portfolio weight.
         bench: Optional Series of benchmark closing prices.
-        window: Rolling window in trading days (default 30 ≈ 1 month).
+        benchmark_name: Label for the benchmark series (e.g., "Nifty 50", "Gold").
 
     Returns:
-        Dict with rolling return statistics and timeseries for plotting.
+        Dict with cumulative return statistics and timeseries for plotting.
     """
-    if prices.empty or len(prices) < window:
-        return {"error": f"Need at least {window} days of data for rolling returns"}
+    if prices.empty:
+        return {"error": "Need price data for cumulative returns"}
 
     returns = prices.pct_change().dropna()
     weight_arr = np.array([weights.get(col, 0) for col in returns.columns])
@@ -116,43 +116,37 @@ def calc_rolling_returns(
         weight_arr = weight_arr / weight_arr.sum()
     portfolio_daily = pd.Series(returns.values @ weight_arr, index=returns.index)
 
-    rolling_port = portfolio_daily.rolling(window=window).apply(
-        lambda x: np.prod(1 + x) - 1, raw=True
-    ).dropna()
+    cum_port = (1 + portfolio_daily).cumprod() - 1
 
-    if rolling_port.empty:
-        return {"error": "Insufficient data for rolling calculation"}
+    if cum_port.empty:
+        return {"error": "Insufficient data for cumulative calculation"}
 
     result = {
-        "window_days": window,
-        "current_rolling_return": float(rolling_port.iloc[-1]),
-        "avg_rolling_return": float(rolling_port.mean()),
-        "best_rolling_return": float(rolling_port.max()),
-        "worst_rolling_return": float(rolling_port.min()),
-        "best_period_end": str(rolling_port.idxmax().date()),
-        "worst_period_end": str(rolling_port.idxmin().date()),
+        "current_return": float(cum_port.iloc[-1]),
+        "best_return": float(cum_port.max()),
+        "worst_return": float(cum_port.min()),
+        "best_period_end": str(cum_port.idxmax().date()),
+        "worst_period_end": str(cum_port.idxmin().date()),
     }
 
     # Add timeseries data for plotting (sample to avoid huge payloads)
-    step = max(1, len(rolling_port) // 250)
-    sampled_port = rolling_port.iloc[::step]
+    step = max(1, len(cum_port) // 250)
+    sampled_port = cum_port.iloc[::step]
     
     result["dates"] = [str(d.date()) for d in sampled_port.index]
-    result["portfolio_rolling"] = [float(v) for v in sampled_port.values]
+    result["portfolio_cumulative"] = [float(v) for v in sampled_port.values]
 
     if bench is not None and not bench.empty:
         bench_ret = bench.pct_change().dropna()
         common = returns.index.intersection(bench_ret.index)
-        if len(common) >= window:
+        if len(common) > 0:
             bench_ret_common = bench_ret.loc[common]
-            rolling_bench = bench_ret_common.rolling(window=window).apply(
-                lambda x: np.prod(1 + x) - 1, raw=True
-            ).dropna()
+            cum_bench = (1 + bench_ret_common).cumprod() - 1
             
             # Sample using the same dates as portfolio where possible
-            rolling_bench_sampled = rolling_bench.reindex(sampled_port.index, method='ffill')
-            result["benchmark_rolling"] = [float(v) if pd.notna(v) else None for v in rolling_bench_sampled.values]
-            result["benchmark_name"] = "Nifty 50"
+            cum_bench_sampled = cum_bench.reindex(sampled_port.index, method='ffill')
+            result["benchmark_cumulative"] = [float(v) if pd.notna(v) else None for v in cum_bench_sampled.values]
+            result["benchmark_name"] = benchmark_name
 
     return result
 

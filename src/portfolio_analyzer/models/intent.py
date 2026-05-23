@@ -17,6 +17,8 @@ class AnalysisIntent(str, Enum):
     SECTOR_EXPOSURE = "sector_exposure"
     PORTFOLIO_OVERVIEW = "overview"
     GENERAL_QUESTION = "general"
+    UNSUPPORTED = "unsupported"
+    END_SESSION = "end_session"
 
 
 # Mapping from intent to the set of metric modules to invoke
@@ -37,6 +39,8 @@ INTENT_METRIC_MAP: dict[AnalysisIntent, list[str]] = {
         "sector",
     ],
     AnalysisIntent.GENERAL_QUESTION: [],
+    AnalysisIntent.UNSUPPORTED: [],
+    AnalysisIntent.END_SESSION: [],
 }
 
 

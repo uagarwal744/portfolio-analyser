@@ -225,8 +225,13 @@ def _coerce_message(raw) -> str:
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     """Process a user query against their portfolio via LangGraph."""
+    from portfolio_analyzer.graph import MAX_GRAPH_STEPS
+
     graph = get_graph()
-    config = {"configurable": {"thread_id": request.session_id}}
+    config = {
+        "configurable": {"thread_id": request.session_id},
+        "recursion_limit": MAX_GRAPH_STEPS,
+    }
 
     # Retrieve portfolio from session store
     portfolio = _portfolio_store.get(request.session_id)

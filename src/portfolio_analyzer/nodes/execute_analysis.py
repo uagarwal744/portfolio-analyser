@@ -17,12 +17,7 @@ logger = logging.getLogger(__name__)
 
 # Metric module dispatch table
 METRIC_RUNNERS = {
-    "returns": lambda prices, weights, bench: {
-        "historical_returns": returns.calc_historical_returns(prices, weights),
-        "cagr": returns.calc_cagr(prices, weights),
-        "period_returns": returns.calc_period_returns(prices, weights),
-        "rolling_returns": returns.calc_rolling_returns(prices, weights, bench=bench),
-    },
+    "returns": None,  # Handled separately (needs dynamic benchmark selection)
     "risk": lambda prices, weights, bench: {
         "volatility": risk.calc_volatility(prices, weights),
         "sharpe_ratio": risk.calc_sharpe_ratio(prices, weights),
@@ -107,7 +102,35 @@ def execute_analysis_node(state: PortfolioState) -> dict[str, Any]:
     all_results: dict[str, Any] = {}
 
     for metric_name in required_metrics:
-        if metric_name == "sector":
+        if metric_name == "returns":
+            # Dynamic benchmark selection for rolling returns
+            requested = (intent.benchmark_requested or "").lower()
+            if "gold" in requested and "Gold" in benchmarks:
+                rolling_bench = benchmarks["Gold"]
+                rolling_bench_name = "Gold"
+            elif bench_series is not None:
+                rolling_bench = bench_series
+                rolling_bench_name = "Nifty 50"
+            else:
+                rolling_bench = None
+                rolling_bench_name = "Benchmark"
+
+            try:
+                all_results["returns"] = {
+                    "historical_returns": returns.calc_historical_returns(close_prices, weights),
+                    "cagr": returns.calc_cagr(close_prices, weights),
+                    "period_returns": returns.calc_period_returns(close_prices, weights),
+                    "cumulative_returns": returns.calc_cumulative_returns(
+                        close_prices, weights,
+                        bench=rolling_bench,
+                        benchmark_name=rolling_bench_name,
+                    ),
+                }
+            except Exception as e:
+                logger.error(f"Returns metric failed: {e}")
+                all_results["returns"] = {"error": str(e)}
+
+        elif metric_name == "sector":
             # Sector analysis uses holding data, not prices
             holdings_data = [
                 {

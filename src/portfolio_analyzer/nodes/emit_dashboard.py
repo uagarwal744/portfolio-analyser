@@ -154,17 +154,21 @@ def _emit_sector_signals(results: dict) -> list[DashboardSignal]:
 
 
 def _emit_benchmark_signals(results: dict) -> list[DashboardSignal]:
-    """Extract benchmark comparison signals."""
+    """Extract benchmark comparison signals for each benchmark (Nifty 50, Gold, etc.)."""
     signals = []
-    comp = results.get("benchmark_comparison", {})
-    if comp and "outperformance" in comp:
-        signals.append(DashboardSignal(
-            signal_type=DashboardSignalType.BENCHMARK_COMPARISON,
-            title="Portfolio vs Nifty 50",
-            data=comp,
-            priority=3,
-            alert_level=AlertLevel.INFO if comp.get("status") == "underperforming" else None,
-        ))
+    for key, comp in results.items():
+        # Skip non-benchmark entries (alpha, tracking_error, excess_returns are nested)
+        if key in ("alpha", "tracking_error", "excess_returns") or not isinstance(comp, dict):
+            continue
+        if "outperformance" in comp or "portfolio_return" in comp:
+            bench_name = comp.get("benchmark_name", key)
+            signals.append(DashboardSignal(
+                signal_type=DashboardSignalType.BENCHMARK_COMPARISON,
+                title=f"Portfolio vs {bench_name}",
+                data=comp,
+                priority=3,
+                alert_level=AlertLevel.INFO if comp.get("status") == "underperforming" else None,
+            ))
     return signals
 
 
@@ -173,7 +177,7 @@ def _emit_returns_signals(results: dict) -> list[DashboardSignal]:
     signals = []
     period = results.get("period_returns", {})
     cagr = results.get("cagr", {})
-    rolling = results.get("rolling_returns", {})
+    cumulative = results.get("cumulative_returns", {})
 
     if period or cagr:
         data = {}
@@ -190,11 +194,11 @@ def _emit_returns_signals(results: dict) -> list[DashboardSignal]:
             priority=3,
         ))
         
-    if rolling and "dates" in rolling and "portfolio_rolling" in rolling:
+    if cumulative and "dates" in cumulative and "portfolio_cumulative" in cumulative:
         signals.append(DashboardSignal(
-            signal_type=DashboardSignalType.ROLLING_RETURNS_CHART,
-            title=f"Rolling {rolling.get('window_days', 30)}-Day Return vs {rolling.get('benchmark_name', 'Benchmark')}",
-            data=rolling,
+            signal_type=DashboardSignalType.CUMULATIVE_RETURNS_CHART,
+            title=f"Cumulative Return vs {cumulative.get('benchmark_name', 'Benchmark')}",
+            data=cumulative,
             priority=4,
         ))
 

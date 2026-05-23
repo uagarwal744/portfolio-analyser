@@ -53,8 +53,8 @@ def _render_signal(signal: dict):
         _render_correlation_heatmap(data)
     elif sig_type == "returns_chart":
         _render_returns_chart(data)
-    elif sig_type == "rolling_returns_chart":
-        _render_rolling_returns_chart(data)
+    elif sig_type == "cumulative_returns_chart":
+        _render_cumulative_returns_chart(data)
     elif sig_type == "benchmark_comparison":
         _render_benchmark_comparison(data)
     elif sig_type == "var_summary":
@@ -68,23 +68,23 @@ def _render_signal(signal: dict):
         st.caption(desc)
 
 
-def _render_rolling_returns_chart(data: dict):
-    """Render a rolling returns timeseries vs benchmark."""
+def _render_cumulative_returns_chart(data: dict):
+    """Render a cumulative returns timeseries vs benchmark."""
     dates = data.get("dates", [])
-    port_rolling = data.get("portfolio_rolling", [])
-    bench_rolling = data.get("benchmark_rolling", [])
+    port_cumulative = data.get("portfolio_cumulative", [])
+    bench_cumulative = data.get("benchmark_cumulative", [])
     
-    if not dates or not port_rolling:
+    if not dates or not port_cumulative:
         return
 
     # Convert to %
-    port_rolling = [v * 100 for v in port_rolling]
+    port_cumulative = [v * 100 for v in port_cumulative]
     
-    df_data = {"Date": pd.to_datetime(dates), "Portfolio": port_rolling}
+    df_data = {"Date": pd.to_datetime(dates), "Portfolio": port_cumulative}
     
-    if bench_rolling:
-        bench_rolling = [v * 100 if v is not None else None for v in bench_rolling]
-        df_data["Benchmark"] = bench_rolling
+    if bench_cumulative:
+        bench_cumulative = [v * 100 if v is not None else None for v in bench_cumulative]
+        df_data["Benchmark"] = bench_cumulative
         
     df = pd.DataFrame(df_data)
     
@@ -92,7 +92,7 @@ def _render_rolling_returns_chart(data: dict):
     fig.update_layout(
         height=300,
         margin=dict(l=10, r=10, t=10, b=10),
-        yaxis=dict(title="Rolling Return (%)"),
+        yaxis=dict(title="Cumulative Return (%)"),
         legend_title_text=""
     )
     st.plotly_chart(fig, use_container_width=True)

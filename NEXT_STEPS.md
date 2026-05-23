@@ -13,13 +13,12 @@ This document outlines planned improvements across five key areas, focusing on m
 
 ---
 
-## 2. Data Ingestion
+## 2. Data Ingestion and Caching
 
 - [ ] **Broker API integration** — Direct OAuth-based import from Zerodha Kite, Groww, etc. to fetch live holdings.
+- [ ] **Own MCP Server** — Build own MCP server to fetch data from NSE, BSE, and other Indian exchanges.
 - [ ] **Mutual fund & ETF support** — Parse and analyze MF/ETF holdings alongside equities.
-- [ ] **Transaction history** — Accept buy/sell transaction logs to compute realized P&L and XIRR.
 - [ ] **Real-time price feeds** — WebSocket-based live price updates for current portfolio value.
-- [ ] **S3/GCS upload** — Cloud storage support for production deployments.
 
 ---
 
@@ -48,3 +47,12 @@ This document outlines planned improvements across five key areas, focusing on m
 - [ ] **Redis caching** — Cache Tapetide API responses and yfinance price data in Redis with TTL.
 - [ ] **Dockerized deployment** — Multi-container setup (API + worker + Redis + Postgres) with docker-compose.
 - [ ] **Multi-tenancy** — Isolated data partitioning for enterprise/white-label use cases.
+
+---
+
+## 6. Observability & Eval
+
+- [ ] **LangSmith / LangFuse tracing** — Instrument every LangGraph run with end-to-end traces (latency per node, token usage, LLM inputs/outputs) for debugging and cost tracking.
+- [ ] **Intent classification eval suite** — Build a labeled dataset of 100+ user queries with expected intents and run automated accuracy benchmarks on every prompt/model change.
+- [ ] **Metric correctness tests** — Property-based tests (e.g., Hypothesis) that validate deterministic metric outputs (Sharpe, VaR, CAGR) against known reference portfolios.
+- [ ] **Dashboard latency budgets** — Track and alert on P95 response times per graph path (analysis vs general vs unsupported) to catch regressions.

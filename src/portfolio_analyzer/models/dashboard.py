@@ -14,7 +14,7 @@ class DashboardSignalType(str, Enum):
     SECTOR_PIE = "sector_pie"
     DRAWDOWN_CHART = "drawdown_chart"
     RETURNS_CHART = "returns_chart"
-    ROLLING_RETURNS_CHART = "rolling_returns_chart"
+    CUMULATIVE_RETURNS_CHART = "cumulative_returns_chart"
     BENCHMARK_COMPARISON = "benchmark_comparison"
     CONCENTRATION_ALERT = "concentration_alert"
     VAR_SUMMARY = "var_summary"

@@ -31,7 +31,7 @@ def render_sidebar(session_id: str):
                 type="csv",
                 help="Must contain columns: ticker, quantity, buy_price"
             )
-            if uploaded_file is not None and st.button("Analyze File", use_container_width=True, type="primary"):
+            if uploaded_file is not None and st.button("Analyse Portfolio", use_container_width=True, type="primary"):
                 _handle_file_upload(session_id, uploaded_file)
 
         with tab2:

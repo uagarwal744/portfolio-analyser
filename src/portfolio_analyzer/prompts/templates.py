@@ -19,15 +19,18 @@ Available analysis types:
 - risk_analysis: Sharpe ratio, Sortino ratio, volatility, beta
 - tail_risk: Value at Risk (VaR), CVaR, max drawdown
 - correlation: Cross-asset correlation, diversification quality
-- benchmark: Portfolio performance vs Nifty 50
+- benchmark: Portfolio performance vs Nifty 50 or Gold
 - returns: Historical returns, CAGR, rolling returns, period returns
 - sector_exposure: Sector breakdown, hidden concentration risks
 - overview: Comprehensive summary of everything
-- general: General question not requiring specific analysis
+- general: General question about finance/markets that doesn't require specific portfolio analysis
+- unsupported: Query is completely unrelated to finance, markets, or portfolio analysis (e.g., "write me a poem", "what's the weather", "tell me a joke"). Use this for ANY off-topic request.
+- end_session: User wants to end the conversation (e.g., "goodbye", "thanks, that's all", "done", "exit")
 
 Classify the user's intent. If the query touches multiple areas, set a primary intent and list secondaries.
 If specific tickers are mentioned, extract them.
 If a time period is mentioned, extract it.
+IMPORTANT: If the user's message is clearly unrelated to finance, investing, stocks, or portfolio analysis, classify it as "unsupported".
 """
 
 RESPONSE_SYNTHESIS_PROMPT = """You are presenting portfolio analysis results to the user. The following metrics were computed using deterministic Python functions (not estimated by AI).
@@ -44,7 +47,7 @@ Instructions:
 4. Use ₹ for monetary values.
 5. Compare metrics to standard benchmarks where relevant.
 6. If there are concentration warnings, lead with those.
-7. Keep the response informative but not overwhelming.
+7. Keep the response concise, informative but not overwhelming, not exceeding 1000 words.
 8. Use markdown formatting for readability.
 """
 

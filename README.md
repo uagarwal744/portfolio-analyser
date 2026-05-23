@@ -7,15 +7,16 @@ A full-stack, AI-powered stock portfolio analyzer built for the Indian stock mar
 *   **Agentic Pipeline (LangGraph)**: Uses Gemini models to understand natural language intent, routing conversations logically to deterministic metric engines.
 *   **Tapetide MCP Integration**: Connects to the [Tapetide MCP Server](https://mcp.tapetide.com/mcp) via the official stateless HTTP transport to fetch comprehensive Indian stock market data (company profiles, quotes, sector mappings, etc).
 *   **Deterministic Financial Metrics**: Performs deep mathematical analysis using `pandas` and `numpy`—bypassing LLM hallucinations for strict numerical accuracy.
-    *   **Returns Analysis**: Historical returns, CAGR, and rolling returns.
+    *   **Returns Analysis**: Historical returns, CAGR, period returns, and cumulative performance.
     *   **Risk Metrics**: Annualized Volatility, Sharpe Ratio, Sortino Ratio, Beta.
     *   **Drawdowns**: Max drawdown, recovery periods, and historical drawdown series.
     *   **Value at Risk (VaR)**: Historical and CVaR calculations.
-    *   **Benchmark Comparisons**: Live tracking against the Nifty 50, computing Jensen's Alpha and Tracking Error.
+    *   **Dynamic Benchmarking**: Live tracking against multiple benchmarks (Nifty 50, Gold), computing Jensen's Alpha and Tracking Error based on the user's requested comparison.
     *   **Sector & Concentration**: Identifies hidden risk concentrations and calculates the Herfindahl index.
-    *   **Gold Analysis**: Comparative analysis against gold prices.
 *   **Dynamic Dashboard**: Generates structured `DashboardSignal`s mapped to Plotly graphs (Heatmaps, Pie Charts, Gauges, Area Charts) rendered seamlessly in the Streamlit UI alongside an interactive chat interface.
-*   **Smart Follow-ups**: Generates context-aware follow-up questions to drive deeper analysis.
+*   **Conversational Flow & Guardrails**: 
+    *   Generates context-aware follow-up questions to drive deeper analysis.
+    *   Gracefully handles out-of-domain queries and session termination requests.
 
 ## Tech Stack
 
